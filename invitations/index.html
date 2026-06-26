@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- 초대 토큰이 사실상 접근 권한이므로 색인/추적 차단 (plan §7).
+         Cache-Control: no-store, Content-Type 등 HTTP 헤더는 GitHub Pages에서 설정 불가(plan §4.1 한계). -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <title>튜립 초대 링크</title>
+    <style>
+      :root {
+        color: #202124;
+        background: #ffffff;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+      }
+
+      .fallback {
+        width: min(100% - 48px, 360px);
+        display: none;
+        gap: 12px;
+        text-align: center;
+      }
+
+      body.ready .fallback {
+        display: grid;
+      }
+
+      h1 {
+        margin: 0 0 4px;
+        font-size: 24px;
+        line-height: 1.3;
+      }
+
+      p {
+        margin: 0 0 12px;
+        color: #5f6368;
+        font-size: 15px;
+        line-height: 1.5;
+      }
+
+      button,
+      a.cta {
+        min-height: 48px;
+        border: 0;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        color: #ffffff;
+        background: #1a73e8;
+        font: inherit;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .secondary {
+        color: #1a73e8;
+        background: #e8f0fe;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      .guide {
+        margin: 4px 0 0;
+        color: #5f6368;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      이 페이지는 open.turip.kro.kr Universal Link / App Link로 들어왔으나
+      앱이 열리지 않은 경우(미설치 또는 사용자가 "웹에서 열기" 선택)에 도달하는 폴백이다(plan §3.2).
+      ⚠️ 같은 open 호스트 링크를 다시 제공하지 않는다(Safari는 같은 호스트 UL로 앱을 안 엶).
+         주 CTA는 invite 호스트로 돌아가게 하고, 스토어·링크 복사를 명시 버튼으로 제공한다.
+      ⚠️ 앱 자동 실행(turip:// / intent://)을 시도하지 않는다 — 이미 앱 실행이 실패한 지점이므로.
+    -->
+    <main class="fallback">
+      <h1>튜립 초대 링크</h1>
+      <p>앱이 설치되어 있지 않거나 열리지 않았어요. 아래에서 계속 진행해주세요.</p>
+
+      <!-- 주 CTA: invite 호스트로 이동(실제 <a>, 클릭 가로채기 금지). open 링크 재제공 금지(plan §3.2). -->
+      <a id="inviteCta" class="cta" href="https://invite.turip.kro.kr/invitations/">
+        초대 페이지 열기
+      </a>
+
+      <!-- 앱 설치: 플랫폼별 스토어 분기(plan §3.2). -->
+      <button id="storeButton" type="button" class="secondary">앱 설치하기</button>
+
+      <!-- 링크 복사: invite URL을 복사(open URL이 아니라 공유용 invite URL). -->
+      <button id="copyLinkButton" type="button" class="secondary">초대 링크 복사</button>
+
+      <p id="manualGuide" class="guide" hidden>
+        iOS는 App Store 앱 ID 확인 후 설치 링크가 제공됩니다. 그 전까지는
+        App Store에서 "튜립"을 검색해 설치한 뒤 위 "초대 페이지 열기"를 눌러주세요.
+      </p>
+    </main>
+    <noscript>
+      <a href="https://play.google.com/store/apps/details?id=com.on.turip">
+        튜립 앱 설치하기
+      </a>
+    </noscript>
+    <script>
+      // ===== 설정 =====
+      const ANDROID_PACKAGE = "com.on.turip";
+
+      // App Store 앱 ID — 확인 후 기입(plan §8 미확정). 비어 있으면 iOS 스토어 이동은 수동 안내로 대체.
+      const IOS_APP_STORE_ID = "";
+
+      // ===== 토큰/URL 구성 (URLSearchParams, 이중 인코딩 금지 plan §5) =====
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get("token");
+
+      // 공유용 랜딩 URL(invite 호스트) — 주 CTA·링크 복사 모두 이 URL 사용(plan §3.2).
+      const inviteUrl = new URL("https://invite.turip.kro.kr/invitations/");
+      if (token) inviteUrl.searchParams.set("token", token);
+
+      const playStoreUrl = new URL("https://play.google.com/store/apps/details");
+      playStoreUrl.searchParams.set("id", ANDROID_PACKAGE);
+      if (token) playStoreUrl.searchParams.set("referrer", token);
+
+      const appStoreUrl = IOS_APP_STORE_ID
+        ? `https://apps.apple.com/app/id${IOS_APP_STORE_ID}`
+        : null;
+
+      // ===== 환경 판별 =====
+      const ua = navigator.userAgent;
+      const isIPadOS =
+        navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+      const isIOS = /iPhone|iPad|iPod/i.test(ua) || isIPadOS;
+      const isAndroid = /Android/i.test(ua);
+
+      function show(id) {
+        const el = document.getElementById(id);
+        if (el) el.hidden = false;
+      }
+
+      function openStore() {
+        if (isAndroid) {
+          location.href = playStoreUrl.toString();
+          return;
+        }
+        if (isIOS && appStoreUrl) {
+          location.href = appStoreUrl;
+          return;
+        }
+        // iOS인데 App Store ID 미확정 또는 미확인 플랫폼: 수동 안내.
+        show("manualGuide");
+      }
+
+      async function copyInviteUrl() {
+        const text = inviteUrl.toString();
+        try {
+          await navigator.clipboard.writeText(text);
+          flashCopied();
+        } catch (_) {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.setAttribute("readonly", "");
+          ta.style.position = "absolute";
+          ta.style.left = "-9999px";
+          document.body.appendChild(ta);
+          ta.select();
+          try {
+            document.execCommand("copy");
+            flashCopied();
+          } catch (_) {
+            /* 복사 실패 시 안내만 유지 */
+          }
+          document.body.removeChild(ta);
+        }
+      }
+
+      function flashCopied() {
+        const btn = document.getElementById("copyLinkButton");
+        const prev = btn.textContent;
+        btn.textContent = "링크를 복사했어요";
+        setTimeout(() => {
+          btn.textContent = prev;
+        }, 1500);
+      }
+
+      function init() {
+        // 주 CTA href: invite 호스트(실제 <a> 탐색, 가로채지 않음).
+        document.getElementById("inviteCta").href = inviteUrl.toString();
+        document
+          .getElementById("storeButton")
+          .addEventListener("click", openStore);
+        document
+          .getElementById("copyLinkButton")
+          .addEventListener("click", copyInviteUrl);
+        document.body.classList.add("ready");
+      }
+
+      init();
+    </script>
+  </body>
+</html>
